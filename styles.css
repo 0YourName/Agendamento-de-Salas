@@ -243,6 +243,30 @@ button:hover {
   padding: 6px 0;
 }
 
+/* Login overlay */
+.login-overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(8, 15, 25, 0.5);
+  z-index: 1200;
+}
+.login-card {
+  background: #fff;
+  padding: 20px;
+  border-radius: 12px;
+  width: 320px;
+  box-shadow: 0 12px 32px rgba(2,6,23,0.2);
+}
+.login-card h2 { margin-top: 0; }
+.user-controls { display:flex; gap:12px; align-items:center; justify-content:space-between; margin-top:10px; }
+.user-info { color:#374151; font-weight:600; }
+.user-actions button { margin-left:8px; }
+.admin-panel { margin-top: 12px; }
+.user-list-item { display:flex; gap:8px; align-items:center; justify-content:space-between; padding:8px 6px; border-bottom:1px solid #eef2f7; }
+
 @media (max-width: 720px) {
   .page-shell {
     padding: 16px;

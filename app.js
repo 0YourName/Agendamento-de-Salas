@@ -4,6 +4,11 @@ const STORAGE_KEYS = {
   CURRENT_USER: 'currentUser'
 };
 
+const AUTH_KEYS = {
+  CONFIRMED: 'confirmedUsers',
+  PENDING: 'pendingUsers'
+};
+
 const defaultRooms = [
   { id: 'lab1', name: 'Laboratório 1' },
   { id: 'lab2', name: 'Laboratório 2' },
@@ -62,6 +67,52 @@ function getCurrentUser() {
 
 function setCurrentUser(user) {
   writeStorage(STORAGE_KEYS.CURRENT_USER, user);
+}
+
+function getConfirmedUsers() {
+  return readStorage(AUTH_KEYS.CONFIRMED, []);
+}
+
+function writeConfirmedUsers(list) {
+  writeStorage(AUTH_KEYS.CONFIRMED, list);
+}
+
+function getPendingUsers() {
+  return readStorage(AUTH_KEYS.PENDING, []);
+}
+
+function writePendingUsers(list) {
+  writeStorage(AUTH_KEYS.PENDING, list);
+}
+
+function isUserConfirmed(name) {
+  const confirmed = getConfirmedUsers();
+  return confirmed.some(u => u.name === name);
+}
+
+function addPendingUser(user) {
+  const list = getPendingUsers();
+  if (!list.some(u => u.name === user.name)) {
+    list.push(user);
+    writePendingUsers(list);
+  }
+}
+
+function confirmUser(name) {
+  let pending = getPendingUsers();
+  pending = pending.filter(u => u.name !== name);
+  writePendingUsers(pending);
+  const confirmed = getConfirmedUsers();
+  if (!confirmed.some(u => u.name === name)) {
+    confirmed.push({ name });
+    writeConfirmedUsers(confirmed);
+  }
+}
+
+function revokeUser(name) {
+  let confirmed = getConfirmedUsers();
+  confirmed = confirmed.filter(u => u.name !== name);
+  writeConfirmedUsers(confirmed);
 }
 
 function createReservation(data) {
@@ -306,6 +357,17 @@ function handleReservationSubmission(event) {
   const userRole = elements.roleSelect.value;
   const reason = elements.reasonInput.value.trim();
 
+  const currentUser = getCurrentUser();
+  if (!currentUser) {
+    displayMessage('Você deve estar logado para criar reservas.', 'error');
+    return;
+  }
+
+  if (!currentUser.isAdmin && !isUserConfirmed(currentUser.name)) {
+    displayMessage('Sua conta precisa ser confirmada por um administrador antes de criar reservas.', 'error');
+    return;
+  }
+
   if (hasConflict(roomId, date, startTime, endTime)) {
     displayMessage('Já existe uma reserva para este horário nesta sala.', 'error');
     return;
@@ -325,7 +387,8 @@ function handleReservationSubmission(event) {
   };
 
   createReservation(reservation);
-  setCurrentUser({ id: reservedBy.toLowerCase().replace(/\s+/g, '-'), name: reservedBy, role: userRole });
+  // ensure current user stored
+  setCurrentUser({ id: reservedBy.toLowerCase().replace(/\s+/g, '-'), name: reservedBy, role: userRole, isAdmin: currentUser && currentUser.isAdmin });
   displayMessage('Reserva criada com sucesso.', 'success');
   renderAvailability();
   clearForm();
@@ -346,14 +409,140 @@ function handleCancel(event) {
     return;
   }
 
-  if (!currentUser || currentUser.name !== reservation.reservedBy) {
-    displayMessage('Apenas o usuário que reservou pode cancelar esta reserva.', 'error');
+  if (!currentUser) {
+    displayMessage('Você precisa estar logado para cancelar reservas.', 'error');
+    return;
+  }
+
+  if (!currentUser.isAdmin && currentUser.name !== reservation.reservedBy) {
+    displayMessage('Apenas o usuário que reservou (ou admin) pode cancelar esta reserva.', 'error');
     return;
   }
 
   removeReservation(reservationId);
   displayMessage('Reserva cancelada com sucesso.', 'success');
   renderAvailability();
+}
+
+// Authentication UI handlers
+function showLoginOverlay(show) {
+  const overlay = document.getElementById('login-overlay');
+  if (!overlay) return;
+  overlay.style.display = show ? 'flex' : 'none';
+  overlay.setAttribute('aria-hidden', show ? 'false' : 'true');
+}
+
+function renderUserInfo() {
+  const info = document.getElementById('user-info');
+  const loginBtn = document.getElementById('login-button');
+  const logoutBtn = document.getElementById('logout-button');
+  const adminPanel = document.getElementById('admin-panel');
+  const currentUser = getCurrentUser();
+  if (!info) return;
+  if (currentUser) {
+    info.textContent = `${currentUser.name} (${currentUser.role})` + (currentUser.isAdmin ? ' — Admin' : '');
+    loginBtn.style.display = 'none';
+    logoutBtn.style.display = 'inline-block';
+    if (adminPanel) adminPanel.style.display = currentUser.isAdmin ? 'block' : 'none';
+  } else {
+    info.textContent = 'Não autenticado';
+    loginBtn.style.display = 'inline-block';
+    logoutBtn.style.display = 'none';
+    if (adminPanel) adminPanel.style.display = 'none';
+  }
+}
+
+function handleLoginSubmit(e) {
+  e.preventDefault();
+  const name = document.getElementById('login-name').value.trim();
+  const password = document.getElementById('login-password').value;
+  const role = document.getElementById('login-role').value;
+  const msg = document.getElementById('login-message');
+
+  if (!name || !password) {
+    if (msg) msg.textContent = 'Preencha nome e senha.';
+    return;
+  }
+
+  // admin shortcut
+  if (name === 'admin' && password === 'admin') {
+    const adminUser = { id: 'admin', name: 'admin', role: 'Admin', isAdmin: true };
+    setCurrentUser(adminUser);
+    if (msg) msg.textContent = 'Entrou como admin.';
+    showLoginOverlay(false);
+    renderUserInfo();
+    renderAdminPanel();
+    return;
+  }
+
+  // Regular users: create pending entry if not confirmed
+  const user = { id: name.toLowerCase().replace(/\s+/g, '-'), name, role };
+  setCurrentUser(user);
+  const confirmed = isUserConfirmed(name);
+  if (!confirmed) {
+    // add to pending
+    addPendingUser(user);
+    if (msg) msg.textContent = 'Usuário pendente de confirmação. Aguarde um admin confirmar.';
+  } else {
+    if (msg) msg.textContent = 'Autenticado com sucesso.';
+  }
+
+  showLoginOverlay(false);
+  renderUserInfo();
+  renderAvailability();
+  renderAdminPanel();
+}
+
+function handleLogout() {
+  setCurrentUser(null);
+  renderUserInfo();
+  renderAvailability();
+}
+
+function renderAdminPanel() {
+  const panel = document.getElementById('admin-panel');
+  if (!panel) return;
+  const currentUser = getCurrentUser();
+  if (!currentUser || !currentUser.isAdmin) {
+    panel.style.display = 'none';
+    return;
+  }
+
+  panel.style.display = 'block';
+  const pendingEl = document.getElementById('pending-list');
+  const confirmedEl = document.getElementById('confirmed-list');
+  pendingEl.innerHTML = '';
+  confirmedEl.innerHTML = '';
+
+  const pending = getPendingUsers();
+  const confirmed = getConfirmedUsers();
+
+  pending.forEach(u => {
+    const div = document.createElement('div');
+    div.className = 'user-list-item';
+    div.innerHTML = `<span>${u.name} (${u.role})</span><div><button data-name="${u.name}" class="primary-button admin-confirm">Confirmar</button></div>`;
+    pendingEl.appendChild(div);
+  });
+
+  confirmed.forEach(u => {
+    const div = document.createElement('div');
+    div.className = 'user-list-item';
+    div.innerHTML = `<span>${u.name}</span><div><button data-name="${u.name}" class="secondary-button admin-revoke">Revogar</button></div>`;
+    confirmedEl.appendChild(div);
+  });
+
+  // attach handlers
+  pendingEl.querySelectorAll('.admin-confirm').forEach(btn => btn.addEventListener('click', (e) => {
+    const name = e.target.dataset.name;
+    confirmUser(name);
+    renderAdminPanel();
+  }));
+
+  confirmedEl.querySelectorAll('.admin-revoke').forEach(btn => btn.addEventListener('click', (e) => {
+    const name = e.target.dataset.name;
+    revokeUser(name);
+    renderAdminPanel();
+  }));
 }
 
 function attachEventListeners() {
@@ -367,6 +556,16 @@ function attachEventListeners() {
   elements.viewRoomSelect.addEventListener('change', () => {
     if (calMonth !== null) renderCalendar(calMonth, calYear);
   });
+
+  // login UI
+  const loginBtn = document.getElementById('login-button');
+  const logoutBtn = document.getElementById('logout-button');
+  const loginForm = document.getElementById('login-form');
+  const loginCancel = document.getElementById('login-cancel');
+  if (loginBtn) loginBtn.addEventListener('click', () => showLoginOverlay(true));
+  if (logoutBtn) logoutBtn.addEventListener('click', handleLogout);
+  if (loginForm) loginForm.addEventListener('submit', handleLoginSubmit);
+  if (loginCancel) loginCancel.addEventListener('click', () => showLoginOverlay(false));
 }
 
 function initializeView() {
@@ -386,6 +585,12 @@ function initialize() {
   getRooms();
   attachEventListeners();
   initializeView();
+  renderUserInfo();
+  renderAdminPanel();
+
+  // show login overlay if no user
+  const cur = getCurrentUser();
+  if (!cur) showLoginOverlay(true);
 }
 
 initialize();
