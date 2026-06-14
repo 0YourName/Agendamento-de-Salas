@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Agendamento de Laboratórios</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <main class="page-shell">
+    <header class="site-header">
+      <div>
+        <p class="eyebrow">Sistema de Agendamento</p>
+        <h1>Salas de Laboratório</h1>
+        <p class="description">Reserve, visualize e cancele agendamentos apenas para seu uso.</p>
+      </div>
+    </header>
+
+    <section class="panel" id="reservation-panel">
+      <h2>Nova Reserva</h2>
+      <form id="reservation-form" class="form-grid">
+        <label>
+          Sala
+          <select id="room-select" required></select>
+        </label>
+
+        <label>
+          Data
+          <input type="date" id="date-input" required />
+        </label>
+
+        <label>
+          Início
+          <input type="time" id="start-input" required />
+        </label>
+
+        <label>
+          Fim
+          <input type="time" id="end-input" required />
+        </label>
+
+        <label>
+          Seu nome
+          <input type="text" id="name-input" placeholder="Digite seu nome" required />
+        </label>
+
+        <label>
+          Papel
+          <select id="role-select" required>
+            <option value="Professor">Professor</option>
+            <option value="Direção">Direção</option>
+            <option value="Zelador">Zelador</option>
+            <option value="Técnico de manutenção">Técnico de manutenção</option>
+          </select>
+        </label>
+
+        <label class="full-width">
+          Motivo
+          <textarea id="reason-input" rows="3" placeholder="Descreva o motivo da reserva" required></textarea>
+        </label>
+
+        <div class="form-actions full-width">
+          <button type="submit" class="primary-button">Reservar</button>
+          <button type="button" id="clear-button" class="secondary-button">Limpar</button>
+        </div>
+      </form>
+      <div id="form-message" class="message" aria-live="polite"></div>
+    </section>
+
+    <section class="panel" id="availability-panel">
+      <div class="panel-header">
+        <h2>Disponibilidade</h2>
+        <div class="inline-fields">
+          <label>
+            Sala
+            <select id="view-room-select"></select>
+          </label>
+          <label>
+            Data
+            <input type="date" id="view-date-input" />
+          </label>
+        </div>
+      </div>
+      <div id="availability-status" class="availability-status"></div>
+      <div id="reservation-list" class="reservation-list"></div>
+    </section>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
