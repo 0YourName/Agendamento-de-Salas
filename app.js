@@ -476,7 +476,6 @@ function handleLoginSubmit(e) {
   e.preventDefault();
   const name = document.getElementById('login-name').value.trim();
   const password = document.getElementById('login-password').value;
-  const role = document.getElementById('login-role').value;
   const msg = document.getElementById('login-message');
 
   if (!name || !password) {
@@ -496,7 +495,7 @@ function handleLoginSubmit(e) {
   }
 
   // Regular users: create pending entry if not confirmed
-  const user = { id: name.toLowerCase().replace(/\s+/g, '-'), name, role };
+  const user = { id: name.toLowerCase().replace(/\s+/g, '-'), name, role: 'Professor' };
   setCurrentUser(user);
   const confirmed = isUserConfirmed(name);
   if (!confirmed) {
