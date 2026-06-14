@@ -24,7 +24,8 @@ const defaultRooms = [
 const elements = {
   roomSelect: document.getElementById('room-select'),
   dateInput: document.getElementById('date-input'),
-  startInput: document.getElementById('start-input'),
+  startHour: document.getElementById('start-hour'),
+  startMinute: document.getElementById('start-minute'),
   nameInput: document.getElementById('name-input'),
   roleSelect: document.getElementById('role-select'),
   reasonInput: document.getElementById('reason-input'),
@@ -34,7 +35,9 @@ const elements = {
   viewRoomSelect: document.getElementById('view-room-select'),
   viewDateInput: document.getElementById('view-date-input'),
   availabilityStatus: document.getElementById('availability-status'),
-  reservationList: document.getElementById('reservation-list')
+  reservationList: document.getElementById('reservation-list'),
+  notificationBell: document.getElementById('notification-bell'),
+  notificationCount: document.getElementById('notification-count')
 };
 
 function readStorage(key, fallback) {
@@ -150,12 +153,46 @@ function hasConflict(roomId, date, startTime, endTime) {
   );
 }
 
-function renderRoomOptions(selectElement) {
+function renderRoomOptions(selectElement, onlyLabs = false) {
   const rooms = getRooms();
-  selectElement.innerHTML = rooms
+  const filtered = onlyLabs
+    ? rooms.filter((room) => room.id.startsWith('lab') || /Laboratório/i.test(room.name))
+    : rooms;
+  selectElement.innerHTML = filtered
     .map((room) => `<option value="${room.id}">${room.name}</option>`)
     .join('');
 }
+
+function getSelectedStartTime() {
+  const hour = elements.startHour.value;
+  const minute = elements.startMinute.value;
+  return `${hour}:${minute}`;
+}
+
+function addMinutesToTime(timeStr, minutesToAdd) {
+  const [hh, mm] = timeStr.split(':').map(Number);
+  const dateObj = new Date();
+  dateObj.setHours(hh, mm + minutesToAdd, 0, 0);
+  const nh = String(dateObj.getHours()).padStart(2, '0');
+  const nm = String(dateObj.getMinutes()).padStart(2, '0');
+  return `${nh}:${nm}`;
+}
+
+function updateNotificationBell() {
+  const currentUser = getCurrentUser();
+  const pending = getPendingUsers();
+  if (!elements.notificationBell || !elements.notificationCount) return;
+  if (currentUser && currentUser.isAdmin && pending.length > 0) {
+    elements.notificationBell.style.display = 'inline-flex';
+    elements.notificationCount.textContent = pending.length;
+    elements.notificationBell.classList.add('new-notification');
+  } else {
+    elements.notificationBell.style.display = 'none';
+    elements.notificationCount.textContent = '';
+    elements.notificationBell.classList.remove('new-notification');
+  }
+}
+
 
 // Calendar state
 let calMonth = null;
@@ -291,7 +328,7 @@ function renderAvailability() {
     .sort((a, b) => a.startTime.localeCompare(b.startTime))
     .map((reservation) => {
       const currentUser = getCurrentUser();
-      const isOwner = currentUser && currentUser.name === reservation.reservedBy;
+      const canCancel = currentUser && (currentUser.isAdmin || currentUser.name === reservation.reservedBy);
       return `
         <article class="reservation-card">
           <h3>${reservation.reason}</h3>
@@ -303,7 +340,7 @@ function renderAvailability() {
           </div>
           <div class="reservation-footer">
             <span class="reservation-badge">Reserva ativa</span>
-            ${isOwner ? `<button data-id="${reservation.id}" class="cancel-button">Cancelar</button>` : ''}
+            ${canCancel ? `<button data-id="${reservation.id}" class="cancel-button">Cancelar</button>` : ''}
           </div>
         </article>
       `;
@@ -320,14 +357,13 @@ function validateForm() {
   const name = elements.nameInput.value.trim();
   const reason = elements.reasonInput.value.trim();
   const date = elements.dateInput.value;
-  const startTime = elements.startInput.value;
+  const startTime = getSelectedStartTime();
 
   if (!name || !reason || !date || !startTime) {
     displayMessage('Preencha todos os campos obrigatórios.', 'error');
     return false;
   }
 
-  // ensure startTime is a valid time
   if (!/^\d{2}:\d{2}$/.test(startTime)) {
     displayMessage('Horário de início inválido.', 'error');
     return false;
@@ -336,12 +372,27 @@ function validateForm() {
   return true;
 }
 
+
 function clearForm() {
   elements.dateInput.value = '';
-  elements.startInput.value = '';
+  elements.startHour.selectedIndex = 0;
+  elements.startMinute.selectedIndex = 0;
   elements.reasonInput.value = '';
   displayMessage('', 'info');
 }
+
+function setCurrentUserNameField() {
+  const currentUser = getCurrentUser();
+  if (!elements.nameInput) return;
+  if (!currentUser) {
+    elements.nameInput.value = '';
+    elements.nameInput.readOnly = false;
+    return;
+  }
+  elements.nameInput.value = currentUser.name;
+  elements.nameInput.readOnly = !currentUser.isAdmin;
+}
+
 
 function handleReservationSubmission(event) {
   event.preventDefault();
@@ -352,20 +403,11 @@ function handleReservationSubmission(event) {
 
   const roomId = elements.roomSelect.value;
   const date = elements.dateInput.value;
-  const startTime = elements.startInput.value;
+  const startTime = getSelectedStartTime();
   const reservedBy = elements.nameInput.value.trim();
   const userRole = elements.roleSelect.value;
   const reason = elements.reasonInput.value.trim();
 
-  // classes always last 1h40m = 100 minutes
-  function addMinutesToTime(timeStr, minutesToAdd) {
-    const [hh, mm] = timeStr.split(':').map(Number);
-    const dateObj = new Date();
-    dateObj.setHours(hh, mm + minutesToAdd, 0, 0);
-    const nh = String(dateObj.getHours()).padStart(2, '0');
-    const nm = String(dateObj.getMinutes()).padStart(2, '0');
-    return `${nh}:${nm}`;
-  }
   const endTime = addMinutesToTime(startTime, 100);
 
   const currentUser = getCurrentUser();
@@ -470,7 +512,10 @@ function renderUserInfo() {
     logoutBtn.style.display = 'none';
     if (adminPanel) adminPanel.style.display = 'none';
   }
+  setCurrentUserNameField();
+  updateNotificationBell();
 }
+
 
 function handleLoginSubmit(e) {
   e.preventDefault();
@@ -539,7 +584,7 @@ function renderAdminPanel() {
   pending.forEach(u => {
     const div = document.createElement('div');
     div.className = 'user-list-item';
-    div.innerHTML = `<span>${u.name} (${u.role})</span><div><button data-name="${u.name}" class="primary-button admin-confirm">Confirmar</button></div>`;
+    div.innerHTML = `<span>${u.name} (${u.role})</span><div><button data-name="${u.name}" class="primary-button admin-confirm">Confirmar</button><button data-name="${u.name}" class="secondary-button admin-deny">Negar</button></div>`;
     pendingEl.appendChild(div);
   });
 
@@ -562,7 +607,20 @@ function renderAdminPanel() {
     revokeUser(name);
     renderAdminPanel();
   }));
+  pendingEl.querySelectorAll('.admin-deny').forEach(btn => btn.addEventListener('click', (e) => {
+    const name = e.target.dataset.name;
+    denyUser(name);
+    renderAdminPanel();
+  }));
 }
+
+function denyUser(name) {
+  let pending = getPendingUsers();
+  pending = pending.filter(u => u.name !== name);
+  writePendingUsers(pending);
+  updateNotificationBell();
+}
+
 
 function attachEventListeners() {
   elements.reservationForm.addEventListener('submit', handleReservationSubmission);
@@ -580,11 +638,11 @@ function attachEventListeners() {
   const loginBtn = document.getElementById('login-button');
   const logoutBtn = document.getElementById('logout-button');
   const loginForm = document.getElementById('login-form');
-  const loginCancel = document.getElementById('login-cancel');
   if (loginBtn) loginBtn.addEventListener('click', () => showLoginOverlay(true));
   if (logoutBtn) logoutBtn.addEventListener('click', handleLogout);
   if (loginForm) loginForm.addEventListener('submit', handleLoginSubmit);
-  if (loginCancel) loginCancel.addEventListener('click', () => showLoginOverlay(false));
+  if (elements.notificationBell) elements.notificationBell.addEventListener('click', showPendingNotifications);
+
 
   // open calendar when user focuses date input (quick mini-picker)
   if (elements.dateInput) {
@@ -606,8 +664,9 @@ function attachEventListeners() {
 }
 
 function initializeView() {
-  renderRoomOptions(elements.roomSelect);
+  renderRoomOptions(elements.roomSelect, true);
   renderRoomOptions(elements.viewRoomSelect);
+  populateTimeSelectors();
   if (!elements.viewDateInput.value) {
     const today = new Date().toISOString().slice(0, 10);
     elements.viewDateInput.value = today;
@@ -617,6 +676,33 @@ function initializeView() {
   renderCalendar(now.getMonth(), now.getFullYear());
   renderAvailability();
 }
+
+function populateTimeSelectors() {
+  const hourSelect = elements.startHour;
+  const minuteSelect = elements.startMinute;
+  if (!hourSelect || !minuteSelect) return;
+
+  hourSelect.innerHTML = Array.from({ length: 14 }, (_, index) => {
+    const hour = index + 7;
+    return `<option value="${String(hour).padStart(2, '0')}">${String(hour).padStart(2, '0')}</option>`;
+  }).join('');
+
+  minuteSelect.innerHTML = [0, 10, 20, 30, 40, 50]
+    .map((minute) => `<option value="${String(minute).padStart(2, '0')}">${String(minute).padStart(2, '0')}</option>`)
+    .join('');
+}
+
+function showPendingNotifications() {
+  const pending = getPendingUsers();
+  if (pending.length === 0) {
+    displayMessage('Nenhuma solicitação de acesso pendente.', 'info');
+    return;
+  }
+  document.getElementById('admin-panel').style.display = 'block';
+  document.getElementById('admin-panel').scrollIntoView({ behavior: 'smooth' });
+  updateNotificationBell();
+}
+
 
 function initialize() {
   getRooms();

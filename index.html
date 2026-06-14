@@ -17,6 +17,9 @@
       <div class="user-controls">
         <div id="user-info" class="user-info" aria-live="polite"></div>
         <div class="user-actions">
+          <button id="notification-bell" class="notification-bell" type="button" aria-label="Notificações de acesso pendente" style="display:none">
+            🔔 <span id="notification-count" class="notification-count"></span>
+          </button>
           <button id="login-button" class="primary-button">Login</button>
           <button id="logout-button" class="secondary-button" style="display:none">Logout</button>
         </div>
@@ -38,7 +41,10 @@
 
         <label>
           Início
-          <input type="time" id="start-input" required step="600" />
+          <div class="time-selectors">
+            <select id="start-hour" required aria-label="Hora de início"></select>
+            <select id="start-minute" required aria-label="Minuto de início"></select>
+          </div>
         </label>
 
         <label>
@@ -109,7 +115,6 @@
         </label>
         <div class="form-actions">
           <button id="login-submit" class="primary-button" type="submit">Entrar</button>
-          <button id="login-cancel" class="secondary-button" type="button">Fechar</button>
         </div>
       </form>
       <div id="login-message" class="message"></div>
