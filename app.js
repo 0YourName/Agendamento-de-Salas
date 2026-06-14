@@ -15,14 +15,16 @@ const defaultRooms = [
   { id: 'lab3', name: 'Laboratório 3' },
   { id: 'sala1', name: 'Sala 101' },
   { id: 'sala2', name: 'Sala 102' },
-  { id: 'sala3', name: 'Sala 103' }
+  { id: 'sala3', name: 'Sala 103' },
+  { id: 'sala4', name: 'Sala 104' },
+  { id: 'sala5', name: 'Sala 105' },
+  { id: 'sala6', name: 'Sala 106' }
 ];
 
 const elements = {
   roomSelect: document.getElementById('room-select'),
   dateInput: document.getElementById('date-input'),
   startInput: document.getElementById('start-input'),
-  endInput: document.getElementById('end-input'),
   nameInput: document.getElementById('name-input'),
   roleSelect: document.getElementById('role-select'),
   reasonInput: document.getElementById('reason-input'),
@@ -319,15 +321,15 @@ function validateForm() {
   const reason = elements.reasonInput.value.trim();
   const date = elements.dateInput.value;
   const startTime = elements.startInput.value;
-  const endTime = elements.endInput.value;
 
-  if (!name || !reason || !date || !startTime || !endTime) {
+  if (!name || !reason || !date || !startTime) {
     displayMessage('Preencha todos os campos obrigatórios.', 'error');
     return false;
   }
 
-  if (startTime >= endTime) {
-    displayMessage('O horário de início deve ser anterior ao horário de fim.', 'error');
+  // ensure startTime is a valid time
+  if (!/^\d{2}:\d{2}$/.test(startTime)) {
+    displayMessage('Horário de início inválido.', 'error');
     return false;
   }
 
@@ -337,7 +339,6 @@ function validateForm() {
 function clearForm() {
   elements.dateInput.value = '';
   elements.startInput.value = '';
-  elements.endInput.value = '';
   elements.reasonInput.value = '';
   displayMessage('', 'info');
 }
@@ -352,10 +353,20 @@ function handleReservationSubmission(event) {
   const roomId = elements.roomSelect.value;
   const date = elements.dateInput.value;
   const startTime = elements.startInput.value;
-  const endTime = elements.endInput.value;
   const reservedBy = elements.nameInput.value.trim();
   const userRole = elements.roleSelect.value;
   const reason = elements.reasonInput.value.trim();
+
+  // classes always last 1h40m = 100 minutes
+  function addMinutesToTime(timeStr, minutesToAdd) {
+    const [hh, mm] = timeStr.split(':').map(Number);
+    const dateObj = new Date();
+    dateObj.setHours(hh, mm + minutesToAdd, 0, 0);
+    const nh = String(dateObj.getHours()).padStart(2, '0');
+    const nm = String(dateObj.getMinutes()).padStart(2, '0');
+    return `${nh}:${nm}`;
+  }
+  const endTime = addMinutesToTime(startTime, 100);
 
   const currentUser = getCurrentUser();
   if (!currentUser) {
@@ -427,10 +438,19 @@ function handleCancel(event) {
 // Authentication UI handlers
 function showLoginOverlay(show) {
   const overlay = document.getElementById('login-overlay');
+  const main = document.querySelector('main');
   if (!overlay) return;
   overlay.style.display = show ? 'flex' : 'none';
   overlay.setAttribute('aria-hidden', show ? 'false' : 'true');
-}
+  if (main) {
+    main.style.pointerEvents = show ? 'none' : '';
+    main.style.filter = show ? 'blur(2px)' : '';
+  }
+  if (show) {
+    const nameField = document.getElementById('login-name');
+    if (nameField) nameField.focus();
+  }
+} 
 
 function renderUserInfo() {
   const info = document.getElementById('user-info');
@@ -566,6 +586,24 @@ function attachEventListeners() {
   if (logoutBtn) logoutBtn.addEventListener('click', handleLogout);
   if (loginForm) loginForm.addEventListener('submit', handleLoginSubmit);
   if (loginCancel) loginCancel.addEventListener('click', () => showLoginOverlay(false));
+
+  // open calendar when user focuses date input (quick mini-picker)
+  if (elements.dateInput) {
+    elements.dateInput.addEventListener('focus', () => {
+      const val = elements.dateInput.value || new Date().toISOString().slice(0,10);
+      const d = new Date(val);
+      renderCalendar(d.getMonth(), d.getFullYear());
+      const cal = document.getElementById('calendar');
+      if (cal) cal.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    });
+    elements.dateInput.addEventListener('click', () => {
+      const val = elements.dateInput.value || new Date().toISOString().slice(0,10);
+      const d = new Date(val);
+      renderCalendar(d.getMonth(), d.getFullYear());
+      const cal = document.getElementById('calendar');
+      if (cal) cal.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    });
+  }
 }
 
 function initializeView() {
@@ -588,9 +626,8 @@ function initialize() {
   renderUserInfo();
   renderAdminPanel();
 
-  // show login overlay if no user
-  const cur = getCurrentUser();
-  if (!cur) showLoginOverlay(true);
+  // always show login first
+  showLoginOverlay(true);
 }
 
 initialize();
