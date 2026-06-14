@@ -31,12 +31,12 @@
 
         <label>
           Início
-          <input type="time" id="start-input" required />
+          <input type="time" id="start-input" required step="600" />
         </label>
 
         <label>
           Fim
-          <input type="time" id="end-input" required />
+          <input type="time" id="end-input" required step="600" />
         </label>
 
         <label>
@@ -80,6 +80,14 @@
             <input type="date" id="view-date-input" />
           </label>
         </div>
+      </div>
+      <div class="calendar-panel">
+        <div class="calendar-controls">
+          <button id="cal-prev" class="secondary-button">&larr;</button>
+          <div id="calendar-month" class="calendar-month"></div>
+          <button id="cal-next" class="secondary-button">&rarr;</button>
+        </div>
+        <div id="calendar" class="calendar-grid" aria-hidden="false"></div>
       </div>
       <div id="availability-status" class="availability-status"></div>
       <div id="reservation-list" class="reservation-list"></div>

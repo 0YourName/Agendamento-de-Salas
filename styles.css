@@ -205,6 +205,44 @@ button:hover {
   color: #b91c1c;
 }
 
+/* Calendar styles */
+.calendar-panel {
+  margin-top: 18px;
+}
+.calendar-controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.calendar-month {
+  font-weight: 600;
+}
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 8px;
+}
+.calendar-cell {
+  padding: 10px;
+  border-radius: 8px;
+  text-align: center;
+  background: #fcfeff;
+  border: 1px solid #e6eef8;
+  cursor: pointer;
+}
+.calendar-cell:hover { box-shadow: 0 4px 10px rgba(16,24,40,0.06); }
+.calendar-cell.outside { opacity: 0.45; }
+.calendar-cell.occupied { background: #fee2e2; border-color: #fecaca; }
+.calendar-cell.free { background: #ecfdf5; border-color: #bbf7d0; }
+.calendar-weekday {
+  font-size: 0.85rem;
+  color: #6b7280;
+  text-align: center;
+  padding: 6px 0;
+}
+
 @media (max-width: 720px) {
   .page-shell {
     padding: 16px;
